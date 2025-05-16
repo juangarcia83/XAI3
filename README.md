@@ -1,4 +1,4 @@
-# XAI - Partial Dependence Plots (PDP)
+# XAI3 - Partial Dependence Plots (PDP)
 
 This repository contains the solution to Exercise 5 of the Explainable AI (XAI) module, focused on model-agnostic methods to interpret machine learning models.
 
