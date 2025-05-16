@@ -11,7 +11,6 @@ To apply Partial Dependence Plots (PDP) using a Random Forest model trained on t
 - `code/`: R scripts to generate the PDPs
 - `report/`: Final report with plots and interpretations
 - `figures/`: Generated plots
-- `day.csv`: Dataset used for analysis (not included in public repos)
 
 ## Summary of Tasks
 
