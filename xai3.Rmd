@@ -1,0 +1,257 @@
+**Exercise 1**
+
+```{r}
+bike_data <- read.csv("C:/Users/juana/Desktop/day.csv")
+
+
+bike_df <- bike_data[, c("workingday", "holiday", "cnt")]
+
+bike_df$seasonWinter <- ifelse(bike_data$season == 1, 1, 0)
+bike_df$seasonSpring <- ifelse(bike_data$season == 2, 1, 0)
+bike_df$seasonSummer <- ifelse(bike_data$season == 3, 1, 0)
+
+bike_df$misty <- ifelse(bike_data$weathersit == 2, 1, 0)
+bike_df$rain <- ifelse(bike_data$weathersit == 3 | bike_data$weathersit == 4, 1, 0)
+
+bike_df$temp <- bike_data$temp * 47 - 8
+bike_df$hum <- bike_data$hum * 100
+bike_df$windspeed <- bike_data$windspeed * 67
+bike_df$days_since_2011 <- as.numeric(as.Date(bike_data$dteday) - as.Date("2011-01-01"))
+```
+
+```{r}
+library(randomForest)     # for random forest models
+library(pdp)              # for partial dependence plots
+library(ggplot2)          
+
+set.seed(123)  # for reproducibility
+bike_model <- randomForest(
+  cnt ~ .,            # cnt as response, all other variables as predictors
+  data = bike_df,
+  ntree = 500,        # number of trees
+)
+```
+
+```{r}
+plot_pdp <- function(var_name, description, show_pdp_line = TRUE) {
+
+  pdp_var <- partial(
+    object = bike_model,
+    pred.var = var_name,
+    grid.resolution = 30,
+    train = bike_df
+  )
+  
+  
+  p1 <- ggplot(pdp_var, aes(x = !!sym(var_name), y = yhat)) +
+    geom_line() +
+    coord_cartesian(ylim = c(0,NA)) + 
+    geom_rug(
+      data    = bike_df,
+      mapping = aes(x = !!sym(var_name)),
+      inherit.aes = FALSE,
+      sides   = "b",
+      alpha = 0.3
+    ) +
+    labs(
+      title = paste("Partial Dependence of Bike Rentals on", description),
+      x = description,
+      y = "Predicted Bike Rentals"
+    ) +
+    theme_minimal()
+  
+  p2 <- ggplot(bike_df, aes(x = !!sym(var_name), y = cnt)) +
+    geom_point(alpha = 0.2) +
+    # Smoothed real data
+    geom_smooth(method = "loess", color = "blue", span=0.7) +
+    labs(
+      title = "Comparison: Real Smoothed vs PDP",
+      x = description,
+      y = "Bike Rentals"
+    ) + theme_minimal()
+  
+  if (show_pdp_line) {
+    p2 <- p2 + geom_line(data = pdp_var, aes(x = !!sym(var_name), y = yhat), color = "red", size = 1)
+  }
+  
+  print(p1)
+  print(p2)
+}
+plot_pdp("days_since_2011", "Days since 01.01.2011")
+```
+
+```{r}
+plot_pdp("temp", "Temperature")
+```
+```{r}
+plot_pdp("hum", "Humidity")
+```
+
+```{r}
+plot_pdp("windspeed", "Windspeed")
+```
+
+**Exercise 2**
+
+
+```{r}
+# ───────────────────────────────────────────────────────────────────────────────
+# 1. Libraries
+# ───────────────────────────────────────────────────────────────────────────────
+library(dplyr)
+library(randomForest)
+library(pdp)
+library(ggplot2)
+
+# ───────────────────────────────────────────────────────────────
+# 2. Leer datos y crear sample
+# ───────────────────────────────────────────────────────────────
+# Leer dataset desde CSV
+bike_df <- read.csv("day.csv")
+
+# Crear una muestra aleatoria para acelerar los cálculos
+set.seed(42)
+sample_data <- bike_df %>%
+  sample_n(500)  # puedes ajustar este número si es necesario
+
+# ───────────────────────────────────────────────────────────────
+# 3. Entrenar modelo Random Forest
+# ───────────────────────────────────────────────────────────────
+bike_model <- randomForest(cnt ~ temp + hum + windspeed + yr + mnth + weekday + season + workingday,
+                           data = sample_data,
+                           ntree = 100)
+
+# ───────────────────────────────────────────────────────────────
+# 4. Calcular PDP bidimensional para temp y hum
+# ───────────────────────────────────────────────────────────────
+pdp_2d <- partial(
+  object    = bike_model,
+  pred.var  = c("temp", "hum"),
+  train     = sample_data,
+  grid.resolution = c(30, 30)  # grilla 30x30
+)
+
+# ───────────────────────────────────────────────────────────────
+# 5. Crear heatmap con geom_tile() y rug plots
+# ───────────────────────────────────────────────────────────────
+p_heat_rug <- ggplot(pdp_2d, aes(x = temp, y = hum, fill = yhat)) +
+  geom_tile() +
+  scale_fill_viridis_c(name = "Predicted\nBike Rentals") +
+  
+  # Rug inferior para temperatura
+  geom_rug(
+    data = sample_data,
+    aes(x = temp, y = NULL),
+    inherit.aes = FALSE,
+    sides = "b",
+    alpha = 0.3
+  ) +
+  
+  # Rug izquierdo para humedad
+  geom_rug(
+    data = sample_data,
+    aes(x = NULL, y = hum),
+    inherit.aes = FALSE,
+    sides = "l",
+    alpha = 0.3
+  ) +
+  
+  labs(
+    title = "2D Partial Dependence Plot: Temperature vs Humidity",
+    x = "Temperature",
+    y = "Humidity"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Mostrar gráfico
+print(p_heat_rug)
+
+```
+**Exercise 3**
+
+```{r}
+house_data <- read.csv("D:/OneDrive/Master Informatik/Erasmus 2024-2025/Lectures/EDM/Practicas/Practica 5 - XAI3 and Deployment/kc_house_data.csv")
+
+set.seed(123)  # for reproducibility
+sampled_house_data <- sample_n(house_data, 5000)
+```
+
+```{r}
+
+house_model <- randomForest(
+  price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + yr_built,
+  data = sampled_house_data,
+)
+```
+
+```{r}
+library(patchwork)   # for easy plot composition
+
+plot_house_pdp <- function(var_name, description, bar = TRUE) {
+  # 1) Compute the PDP
+  pdp_var <- partial(
+    object          = house_model,
+    pred.var        = var_name,
+    grid.resolution = 30,
+    train           = sampled_house_data
+  )
+  
+  x_range <- range(sampled_house_data[var_name], na.rm = TRUE)
+  
+  # 2) Main PDP line plot
+  p1 <- ggplot(pdp_var, aes(x = !!sym(var_name), y = yhat)) +
+    geom_line(size = 1) +
+    coord_cartesian(ylim = c(0, NA), xlim = x_range) +
+    labs(
+      title = paste("Partial Dependence of Predicted Price on", description),
+      x = NULL,
+      y     = "Predicted Price"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x  = element_blank()  # remove x-axis text
+    )
+  
+  # 3) Bottom marginal density plot
+  p_bottom <- ggplot(sampled_house_data, aes(x = !!sym(var_name))) +
+    coord_cartesian(xlim = x_range) +
+    theme_minimal() +
+    theme(
+      axis.text.y  = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      plot.margin   = margin(t = 0)      # remove top margin so it butt‑joins p1
+    )
+  
+  if (bar) {
+    p_bottom <- p_bottom + 
+      geom_bar(fill = "grey80", alpha = 0.8) +
+      scale_x_continuous(breaks = scales::pretty_breaks(n = 8)) +
+      labs(x = description, y = "Count")
+  } else {
+     p_bottom <- p_bottom + 
+      geom_density(fill = "grey80", alpha = 0.8) +
+      labs(x = description, y = "Density")
+  }
+  
+  # 4) Assemble: PDP on top, density below
+  combined <- p1 / p_bottom +
+    plot_layout(heights = c(4, 1))     # 80% height for PDP, 20% for density
+  
+  print(combined)
+}
+plot_house_pdp("bedrooms", "Bedroom")
+```
+
+```{r}
+plot_house_pdp("bathrooms", "Bathrooms")
+```
+
+```{r}
+plot_house_pdp("sqft_living", "Square-Foot Living Room", FALSE)
+```
+
+```{r}
+plot_house_pdp("floors", "Floors")
+```
